@@ -1,10 +1,43 @@
 import express from "express";
 import mongoose from "mongoose";
 import Messages from "./dbMessages.js";
+import Pusher from "pusher";
+// var Pusher = require('pusher');
 
 // App Config
 const app = express();
 const port = 8000;
+
+const pusher = new Pusher({
+  appId: "1076046",
+  key: "cb6ab0b0f095d65082cd",
+  secret: "4236b3196eddbf9550f3",
+  cluster: "us3",
+  encrypted: true,
+});
+
+const db = mongoose.connection;
+
+db.once("open", () => {
+  console.log("DB Connected");
+
+  const msgCollection = db.collection("messagecontents");
+  const changeStream = msgCollection.watch();
+
+  changeStream.on("change", (change) => {
+    // console.log(change);
+
+    if (change.operationType === "insert") {
+      const messageDetails = change.fullDocument;
+      pusher.trigger("messages", "inserted", {
+        name: messageDetails.user,
+        message: messageDetails.message,
+      });
+    } else {
+      console.log("Error triggering Pusher");
+    }
+  });
+});
 
 // Middleware
 app.use(express.json());
